@@ -1,0 +1,22 @@
+{
+  "name": "plus-config",
+  "version": "0.0.1",
+  "description": "config loader",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/13w/plus-config.git"
+  },
+  "keywords": [
+    "config", "loader", "config loader"
+  ],
+  "author": "Vladimir Bulyga <zero@13w.me>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/13w/plus-config/issues"
+  },
+  "homepage": "https://github.com/13w/plus-config#readme"
+}

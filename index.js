@@ -136,6 +136,8 @@ Object.defineProperties(config, {
 
                 config[section] = Object.keys(content).reduce((result, section) => {
                     if (section === 'default') {
+                        result[config.environment] = result[config.environment] || {};
+                        Object.assign(result[config.environment], defaultConfig);
                         return result;
                     }
 
@@ -162,3 +164,4 @@ Object.defineProperties(config, {
 if (startLoader) {
     config.load('config');
 }
+

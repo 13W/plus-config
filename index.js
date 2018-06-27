@@ -219,6 +219,20 @@ Object.defineProperties(config, {
             }
 
             res.object[res.key] = value;
+
+            return config;
+        }
+    },
+    assign: {
+        ...propOpts,
+        value(key, value) {
+            const res = search(key, config);
+            if (res.key === '$' || !res.object) {
+                return config;
+            }
+
+            Object.assign(res.object[res.key], value);
+            return config;
         }
     }
 });

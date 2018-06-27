@@ -1,6 +1,6 @@
 {
   "name": "plus-config",
-  "version": "0.0.23",
+  "version": "0.0.25",
   "description": "config loader",
   "main": "index.js",
   "scripts": {

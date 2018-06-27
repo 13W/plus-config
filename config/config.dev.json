@@ -1,0 +1,9 @@
+{
+  "server": {
+    "ssl": true
+  },
+  "database": {
+    "connect": "tcp://1.2.3.4:5678/test"
+  },
+  "web": true
+}

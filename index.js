@@ -1,8 +1,4 @@
 /**
- * Created by Vladimir <zero@13w.me> on 14.09.17.
- */
-
-/**
  * Created by Vladimir <zero@13w.me> on 09.05.17.
  */
 'use strict';
@@ -88,6 +84,59 @@ const search = (path, object, options) => {
 };
 
 Object.defineProperties(config, {
+    parseArgs: {
+        ...propOpts,
+        value(schema = {}) {
+            const argv = process.argv.slice(2);
+            argv.push(null);
+
+            let key = null,
+                value = null;
+
+            while (argv.length > 0) {
+                if (key && value) {
+                    if (schema[key]) {
+                        value = schema[key](value);
+                    }
+
+                    config.set(key, value);
+                    key = null;
+                    value = null;
+                }
+
+                const arg = argv.shift();
+                if (arg === null) {
+                    if (key && !value) {
+                        value = true;
+                        argv.push(null);
+                        continue;
+                    }
+                    break;
+                }
+
+                if (key === null) {
+                    if (arg.substr(0, 2) === '--') {
+                        [key, value] = arg.substr(2).split('=');
+                        continue;
+                    }
+
+                    if (arg.substr(0, 1) === '-') {
+                        continue;
+                    }
+                }
+
+                if (value === null) {
+                    if (arg.substr(0, 2) === '--') {
+                        value = true;
+                        argv.unshift(arg);
+                        continue;
+                    }
+
+                    value = arg;
+                }
+            }
+        }
+    },
     load: {
         ...propOpts,
         value: (configPath) => {
@@ -150,6 +199,8 @@ Object.defineProperties(config, {
                 }, {});
             });
 
+            config.parseArgs();
+
             return config;
         }
     },
@@ -158,10 +209,21 @@ Object.defineProperties(config, {
         value: (key) => {
             return search(key, config).value;
         }
+    },
+    set: {
+        ...propOpts,
+        value(key, value) {
+            const res = search(key, config);
+            if (res.key === '$' || !res.object) {
+                return config;
+            }
+
+            res.object[res.key] = value;
+        }
     }
 });
-
-if (startLoader) {
-    config.load('config');
-}
-
+setImmediate(() => {
+    if (startLoader) {
+        config.load('config');
+    }
+});

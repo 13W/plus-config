@@ -14,12 +14,15 @@ const config = module.exports = {
     environment: {'dev': 'development', 'pro': 'production'}[env] || processEnv
 };
 
-let startLoader = true;
-
-const propOpts = {
-    enumerable: false,
-    writable: false,
-    configurable: false
+const defineHiddenProperty = (object, properties) => {
+    for (const [property, value] of Object.entries(properties)) {
+        Object.defineProperty(object, property, {
+            enumerable: false,
+            configurable: false,
+            writable: true,
+            value
+        });
+    }
 };
 
 /**
@@ -83,161 +86,147 @@ const search = (path, object, options) => {
     };
 };
 
-Object.defineProperties(config, {
-    parseArgs: {
-        ...propOpts,
-        value(schema = {}) {
-            const argv = process.argv.slice(2);
-            argv.push(null);
+defineHiddenProperty(config, {
+    parseArgs(schema = {}) {
+        const argv = process.argv.slice(2);
+        argv.push(null);
 
-            let key = null,
+        let key = null,
+            value = null;
+
+        while (argv.length > 0) {
+            if (key && value) {
+                if (schema[key]) {
+                    value = schema[key](value);
+                }
+
+                config.set(key, value);
+                key = null;
                 value = null;
+            }
 
-            while (argv.length > 0) {
-                if (key && value) {
-                    if (schema[key]) {
-                        value = schema[key](value);
-                    }
+            const arg = argv.shift();
+            if (arg === null) {
+                if (key && !value) {
+                    value = true;
+                    argv.push(null);
+                    continue;
+                }
+                break;
+            }
 
-                    config.set(key, value);
-                    key = null;
-                    value = null;
+            if (key === null) {
+                if (arg.substr(0, 2) === '--') {
+                    [key, value] = arg.substr(2).split('=');
+                    continue;
                 }
 
-                const arg = argv.shift();
-                if (arg === null) {
-                    if (key && !value) {
-                        value = true;
-                        argv.push(null);
-                        continue;
-                    }
-                    break;
+                if (arg.substr(0, 1) === '-') {
+                    continue;
+                }
+            }
+
+            if (value === null) {
+                if (arg.substr(0, 2) === '--') {
+                    value = true;
+                    argv.unshift(arg);
+                    continue;
                 }
 
-                if (key === null) {
-                    if (arg.substr(0, 2) === '--') {
-                        [key, value] = arg.substr(2).split('=');
-                        continue;
-                    }
-
-                    if (arg.substr(0, 1) === '-') {
-                        continue;
-                    }
-                }
-
-                if (value === null) {
-                    if (arg.substr(0, 2) === '--') {
-                        value = true;
-                        argv.unshift(arg);
-                        continue;
-                    }
-
-                    value = arg;
-                }
+                value = arg;
             }
         }
     },
-    load: {
-        ...propOpts,
-        value: (configPath) => {
-            startLoader = false;
-            const configDir = path.resolve(process.cwd(), configPath);
-            const files = fs.readdirSync(configDir)
-                .map((filename) => {
-                    const extension = path.extname(filename);
-                    if (extension !== '.json') {
-                        return false;
-                    }
-
-                    const parsed = path.basename(filename, extension).split('.');
-                    if (parsed.length > 1 && parsed[1] !== env) {
-                        return false;
-                    }
-
-                    return parsed;
-                })
-                .filter(Boolean);
-
-            files.sort((prev, next) => {
-                const pl = prev.length,
-                    nl = next.length;
-
-                return pl > nl ? 1 : pl === nl ? 0 : -1;
-            });
-
-            files.forEach((file) => {
-                const filePath = path.resolve(configDir, [].concat(file, 'json').join('.'));
-
-                const section = file[0],
-                    content = require(filePath),
-                    defaultConfig = content.default;
-
-                if (section === 'config') {
-                    Object.assign(config, content);
-                    return;
+    load(configPath) {
+        const configDir = path.resolve(process.cwd(), configPath);
+        const files = fs.readdirSync(configDir)
+            .map((filename) => {
+                const extension = path.extname(filename);
+                if (extension !== '.json') {
+                    return false;
                 }
 
-                config[section] = config[section] || {};
-                if (!defaultConfig) {
-                    Object.assign(config[section], content);
-                    return;
+                const parsed = path.basename(filename, extension).split('.');
+                if (parsed.length > 1 && parsed[1] !== env) {
+                    return false;
                 }
 
-                config[section] = Object.keys(content).reduce((result, section) => {
-                    if (section === 'default') {
-                        result[config.environment] = result[config.environment] || {};
-                        Object.assign(result[config.environment], defaultConfig);
-                        return result;
-                    }
+                return parsed;
+            })
+            .filter(Boolean);
 
-                    result[section] = {
-                        ...defaultConfig,
-                        ...content[section]
-                    };
+        files.sort((prev, next) => {
+            const pl = prev.length,
+                nl = next.length;
 
+            return pl > nl ? 1 : pl === nl ? 0 : -1;
+        });
+
+        files.forEach((file) => {
+            const filePath = path.resolve(configDir, [].concat(file, 'json').join('.'));
+
+            const section = file[0],
+                content = require(filePath),
+                defaultConfig = content.default;
+
+            if (section === 'config') {
+                Object.assign(config, content);
+                return;
+            }
+
+            config[section] = config[section] || {};
+            if (!defaultConfig) {
+                Object.assign(config[section], content);
+                return;
+            }
+
+            config[section] = Object.keys(content).reduce((result, section) => {
+                if (section === 'default') {
+                    result[config.environment] = result[config.environment] || {};
+                    Object.assign(result[config.environment], defaultConfig);
                     return result;
-                }, {});
-            });
+                }
 
-            config.parseArgs();
+                result[section] = {
+                    ...defaultConfig,
+                    ...content[section]
+                };
 
+                return result;
+            }, {});
+        });
+
+        config.parseArgs();
+
+        return config;
+    },
+    get(key) {
+        return search(key, config).value;
+    },
+    set(key, value) {
+        const res = search(key, config);
+        if (res.key === '$' || !res.object) {
             return config;
         }
-    },
-    get: {
-        ...propOpts,
-        value: (key) => {
-            return search(key, config).value;
-        }
-    },
-    set: {
-        ...propOpts,
-        value(key, value) {
-            const res = search(key, config);
-            if (res.key === '$' || !res.object) {
-                return config;
-            }
 
+        res.object[res.key] = value;
+
+        return config;
+    },
+    assign(key, value) {
+        const res = search(key, config);
+        if (res.key === '$' || !res.object) {
+            return config;
+        }
+
+        if (!res.object[res.key]) {
             res.object[res.key] = value;
-
-            return config;
-        }
-    },
-    assign: {
-        ...propOpts,
-        value(key, value) {
-            const res = search(key, config);
-            if (res.key === '$' || !res.object) {
-                return config;
-            }
-
+        } else {
             Object.assign(res.object[res.key], value);
-            return config;
         }
+
+        return config;
     }
 });
-setImmediate(() => {
-    if (startLoader) {
-        config.load('config');
-    }
-});
+
+config.load('config');
